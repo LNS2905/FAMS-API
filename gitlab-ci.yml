@@ -1,0 +1,34 @@
+image: maven:latest
+
+stages:
+  - test
+  - deploy
+
+variables:
+  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+  SSH_PRIVATE_KEY: $SSH_PRIVATE_KEY
+
+before_script:
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  - chmod 600 ~/.ssh/config
+
+test_backend:
+  stage: test
+  script:
+    - echo "Running backend tests..."
+    - ./mvnw test
+
+deploy_backend:
+  stage: deploy
+  script:
+    - echo "Building backend app..."
+    - ./mvnw $MAVEN_CLI_OPTS clean package
+    - echo "Deploying backend app to server..."
+    - scp -o "StrictHostKeyChecking=no" -i ~/.ssh/FamsNew target/beco.jar root@68.183.178.176:/var/www/famsBE
+    - echo "Restarting backend server..."
+    - ssh -o "StrictHostKeyChecking=no" -i ~/.ssh/FamsNew root@68.183.178.176 'pid=$(sudo lsof -t -i :8080); if [ -z "$pid" ]; then echo "Start server..."; else echo "Restart server..."; sudo kill -9 "$pid"; fi; cd /var/www/famsBE; nohup java -jar beco.jar > /dev/null 2>&1 &'

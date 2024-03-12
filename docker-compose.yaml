@@ -1,0 +1,63 @@
+# version: '3.8'
+# services:
+#   pg-database:
+#     container_name: postgres-develops
+#     image: "postgres:latest"
+#     restart: always
+#     networks:
+#       - prod-fa-network
+#     environment:
+#       POSTGRES_PASSWORD: deeYjf4Q1RIX4XUsnrpRFUtP0epyZ3QtpahWEl5E57YrEdQ9eQ
+#       POSTGRES_USER: postgres
+#       POSTGRES_DB: FAMSDb
+#     volumes:
+#       - /root/postgres_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test:
+#         [
+#           "CMD-SHELL",
+#           "pg_isready -U postgres -d FAMSDb -h pg-database -p 5432"
+#         ]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 3
+
+#   pgadmin-prod:
+#     image: dpage/pgadmin4:latest
+#     restart: always
+#     environment:
+#       PGADMIN_DEFAULT_EMAIL: nhatsang@gmail.com
+#       PGADMIN_DEFAULT_PASSWORD: 290503sang
+#       PGADMIN_LISTEN_PORT: 3333
+#     ports:
+#       - "3333:3333"
+#     networks:
+#       - prod-fa-network
+#     # volumes:
+#     #   - ${PGADMIN_STORE_LOCATION}/servers.json:/pgadmin4/servers.json
+#     #   - ${PGADMIN_STORE_LOCATION}:/var/lib/pgadmin
+
+#   api-backend:
+#     container_name: fams_api
+#     image: ${DOCKER_IMAGE}
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     ports:
+#       - "8080:8080"
+#     environment:
+
+#       URL_DB: pg-database
+#       USER_POSTGRES: postgres
+#       PASSWORD_POSTGRES: deeYjf4Q1RIX4XUsnrpRFUtP0epyZ3QtpahWEl5E57YrEdQ9eQ
+#     restart: always
+#     networks:
+#       - prod-fa-network
+#     depends_on:
+#       pg-database:
+#         condition: service_healthy
+
+# networks:
+#   prod-fa-network:
+
+

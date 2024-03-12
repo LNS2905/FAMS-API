@@ -1,0 +1,117 @@
+image: maven:latest
+stages:
+  - test
+  - sonarqube-check
+  - sonarqube-vulnerability-report
+  - automated-api-tests
+  - deploy
+
+variables:
+  # JAVA_HOME: "/usr/lib/jvm/jdk-17"
+  # MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+  SSH_PRIVATE_KEY: $SSH_PRIVATE_KEY
+  POSTMAN_API_KEY: ${POSTMAN_API_KEY}
+  DB_URL: ${URL_DB}
+  USER_POSTGRES: $USER_POSTGRES
+  PASSWORD_POSTGRES: $PASSWORD_POSTGRES
+  EMAIL: $EMAIL
+  EPASS: $EPASS
+
+  
+
+before_script:
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  - chmod 600 ~/.ssh/config
+  # - apt-get update -qy
+  # - apt-get install -y openjdk-17-jdk
+  - chmod +x mvnw
+  # - curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+
+test_backend:
+  stage: test
+  script:
+    - echo "Running backend tests..."
+    - echo "$URL_DB"
+    # - ./mvnw test
+    - DB_URL=${URL_DB} USER_POSTGRES=${USER_POSTGRES} PASSWORD_POSTGRES=${PASSWORD_POSTGRES} ./mvnw test
+
+sonarqube-check:
+  stage: sonarqube-check
+  image: maven:3-eclipse-temurin-17
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - mvn verify sonar:sonar
+  allow_failure: true
+  only:
+    - merge_requests
+    - master
+    - main
+    - develop
+
+sonarqube-vulnerability-report:
+  stage: sonarqube-vulnerability-report
+  script:
+    - 'curl -u "${SONAR_TOKEN}:" "${SONAR_HOST_URL}/api/issues/gitlab_sast_export?projectKey=fams-sonarqube-sang_ci-cd&branch=${CI_COMMIT_BRANCH}&pullRequest=${CI_MERGE_REQUEST_IID}" -o gl-sast-sonar-report.json'
+  allow_failure: true
+  # only:
+  #   - merge_requests
+  #   - master
+  #   - main
+  #   - develop
+  artifacts:
+    expire_in: 1 day
+    reports:
+      sast: gl-sast-sonar-report.json
+  dependencies:
+    - sonarqube-check
+
+  
+# automated-api-tests:
+#   stage: automated-api-tests
+#   image: cimg/base:latest 
+#   script:
+#     # Login using your Postman API keys
+#     - postman login --with-api-key $POSTMAN_API_KEY
+#     - postman collection run "33133384-ffe3a54f-55ed-4a24-9edd-d95ee42d9726"
+
+# deploy_backend:
+#   stage: deploy
+#   script:
+    # - echo "Building backend app..."
+    # - ./mvnw $MAVEN_CLI_OPTS clean package
+    # - ./mvnw clean install  
+    # - echo "Deploying backend app to server..."
+    # - scp -o "StrictHostKeyChecking=no" -i ~/.ssh/FamsNew target/beco.jar root@68.183.178.176:/var/www/famsBE
+    # - echo "Restarting backend server..."
+    # - ssh -o "StrictHostKeyChecking=no" -i ~/.ssh/FamsNew root@68.183.178.176 'pid=$(sudo lsof -t -i :8080); if [ -z "$pid" ]; then echo "Start server..."; else echo "Restart server..."; sudo kill -9 "$pid"; fi; cd /var/www/famsBE; nohup java -jar beco.jar > /dev/null 2>&1 &'
+    # - echo "Deploying backend app to server by Docker..."
+    # - docker compose down --rmi all
+    # - docker compose up -d
+
+# deploy_backend:
+#   stage: deploy
+#   script:
+#     - echo "Building backend app..."
+#     # - ./mvnw $MAVEN_CLI_OPTS clean package
+#     - ./mvnw clean install  
+#     - echo "Deploying backend app to server..."
+#     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+#     - scp -o "StrictHostKeyChecking=no" -i <(echo "$SSH_PRIVATE_KEY" | tr -d '\r') target/beco.jar root@68.183.178.176:/var/www/famsBE
+#     - echo "Restarting backend server..."
+#     - ssh -o "StrictHostKeyChecking=no" -i <(echo "$SSH_PRIVATE_KEY" | tr -d '\r') root@68.183.178.176 'pid=$(sudo lsof -t -i :8080); if [ -z "$pid" ]; then echo "Start server..."; else echo "Restart server..."; sudo kill -9 "$pid"; fi; cd /var/www/famsBE; nohup java -jar beco.jar > /dev/null 2>&1 &'
+
+    
+#   only:
+#     - main
+
